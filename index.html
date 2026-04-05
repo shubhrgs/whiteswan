@@ -194,7 +194,7 @@
             <h1>🦢 WhiteSwan AI Agent</h1>
             <div class="badge-container">
                 <span class="badge">🧠 NVIDIA Nemotron 3 Super</span>
-                <span class="badge">⚡ Word‑by‑word Reasoning</span>
+                <span class="badge">⚡ Real‑time Reasoning</span>
                 <span class="badge">☁️ Cloudflare Worker</span>
             </div>
         </header>
@@ -236,11 +236,11 @@
             }
         }
 
-        // Force a repaint by reading layout properties and yielding
+        // Force a repaint by waiting for next animation frame and reading layout
         async function forceRepaint() {
             await new Promise(resolve => {
                 requestAnimationFrame(() => {
-                    // Force a synchronous layout flush
+                    // Force synchronous layout recalculation
                     document.body.offsetHeight;
                     resolve();
                 });
@@ -273,6 +273,7 @@
             let reasoningDiv = null;
             let reasoningContentElem = null;
             let fullResponse = '';
+            let firstReasoning = true;
             
             try {
                 const response = await fetch(`${API_BASE}/api/chat`, {
@@ -305,12 +306,13 @@
                                 const data = JSON.parse(dataStr);
                                 
                                 if (data.reasoning) {
-                                    if (thinkingDiv && thinkingDiv.style.display !== 'none') {
-                                        thinkingDiv.style.display = 'none';
+                                    // On first reasoning chunk, hide thinking placeholder and create reasoning box
+                                    if (firstReasoning) {
+                                        firstReasoning = false;
+                                        if (thinkingDiv) thinkingDiv.style.display = 'none';
                                         responseDiv.style.display = 'block';
-                                        await forceRepaint();
-                                    }
-                                    if (!reasoningDiv) {
+                                        await forceRepaint(); // Force immediate removal
+                                        
                                         reasoningDiv = document.createElement('div');
                                         reasoningDiv.className = 'reasoning';
                                         reasoningDiv.innerHTML = `
@@ -321,23 +323,27 @@
                                         `;
                                         contentDiv.insertBefore(reasoningDiv, responseDiv);
                                         reasoningContentElem = reasoningDiv.querySelector('.reasoning-content');
-                                        await forceRepaint();
+                                        await forceRepaint(); // Ensure reasoning box is painted
                                     }
+                                    
+                                    // Append reasoning chunk and force repaint
                                     reasoningContentElem.textContent += data.reasoning;
                                     autoScroll();
-                                    await forceRepaint();
+                                    await forceRepaint(); // Show each word as it arrives
                                 }
                                 
                                 if (data.content) {
-                                    if (thinkingDiv && thinkingDiv.style.display !== 'none') {
+                                    if (firstReasoning && thinkingDiv) {
+                                        // If no reasoning was shown, hide thinking placeholder now
                                         thinkingDiv.style.display = 'none';
                                         responseDiv.style.display = 'block';
                                         await forceRepaint();
+                                        firstReasoning = false;
                                     }
                                     fullResponse += data.content;
                                     responseDiv.textContent = fullResponse;
                                     autoScroll();
-                                    await forceRepaint();
+                                    await forceRepaint(); // Stream final answer word by word
                                 }
                                 
                                 if (data.error) {
@@ -350,12 +356,13 @@
                     }
                 }
                 
+                // Clean up
                 if (thinkingDiv) thinkingDiv.remove();
                 const cursor = contentDiv.querySelector('.cursor');
                 if (cursor) cursor.remove();
                 
                 if (!fullResponse && !reasoningDiv) {
-                    responseDiv.textContent = 'No response received.';
+                    responseDiv.textContent = 'No response received. The API may be rate-limited.';
                     responseDiv.style.display = 'block';
                 }
                 
@@ -367,7 +374,7 @@
                 }
                 
             } catch (error) {
-                console.error(error);
+                console.error('Fetch error:', error);
                 contentDiv.innerHTML = `<em>⚠️ Network error: ${error.message}</em>`;
             } finally {
                 isStreaming = false;
