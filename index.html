@@ -3,16 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🦢 Greyswan AI Agent</title>
-    <meta name="description" content="AI agent powered by NVIDIA Nemotron 3 Super with reasoning capabilities">
+    <title>WhiteSwan AI - NVIDIA Nemotron 3 Super</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #0a0a2a 0%, #1a1a3e 100%);
             min-height: 100vh;
             color: #fff;
-            line-height: 1.6;
         }
         .app {
             max-width: 1200px;
@@ -29,15 +31,9 @@
         }
         h1 {
             font-size: 2.5rem;
-            background: linear-gradient(135deg, #76d7c4, #58d68d, #f7dc6f);
+            background: linear-gradient(135deg, #e0e0e0, #ffffff, #a0a0a0);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 8px;
-        }
-        .subtitle {
-            color: rgba(255,255,255,0.7);
-            font-size: 1rem;
-            margin-bottom: 12px;
         }
         .badge-container {
             display: flex;
@@ -51,14 +47,7 @@
             padding: 6px 14px;
             border-radius: 20px;
             font-size: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
-        .badge.free { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
-        .badge.reasoning { background: rgba(241, 196, 15, 0.2); color: #f1c40f; }
-        .badge.streaming { background: rgba(52, 152, 219, 0.2); color: #3498db; }
-        
         .chat-area {
             flex: 1;
             overflow-y: auto;
@@ -66,7 +55,6 @@
             margin: 20px 0;
             background: rgba(0,0,0,0.3);
             border-radius: 20px;
-            scroll-behavior: smooth;
         }
         .message {
             margin-bottom: 20px;
@@ -77,14 +65,17 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .message.user { justify-content: flex-end; }
-        .message.assistant { justify-content: flex-start; }
+        .message.user {
+            justify-content: flex-end;
+        }
+        .message.assistant {
+            justify-content: flex-start;
+        }
         .message-content {
-            max-width: 85%;
+            max-width: 80%;
             padding: 14px 20px;
             border-radius: 24px;
-            line-height: 1.6;
-            word-wrap: break-word;
+            line-height: 1.5;
         }
         .user .message-content {
             background: linear-gradient(135deg, #3498db, #2980b9);
@@ -97,48 +88,41 @@
         .reasoning {
             background: rgba(241, 196, 15, 0.1);
             border-left: 3px solid #f1c40f;
-            padding: 12px 16px;
-            margin: 8px 0 16px;
+            padding: 12px;
+            margin-bottom: 12px;
             border-radius: 8px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            color: #f1c40f;
         }
         .reasoning-label {
-            font-weight: 600;
-            margin-bottom: 8px;
+            font-weight: bold;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
             gap: 8px;
             cursor: pointer;
-            color: #f1c40f;
-            user-select: none;
         }
         .reasoning-content {
             white-space: pre-wrap;
             word-wrap: break-word;
-            color: rgba(241, 196, 15, 0.9);
-            font-size: 0.95rem;
         }
-        .reasoning-content.collapsed { display: none; }
         .response-text {
             white-space: pre-wrap;
             word-wrap: break-word;
         }
-        .response-text p { margin: 0.5em 0; }
-        .response-text code {
+        pre {
+            background: #1e1e1e;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+            font-size: 0.85rem;
+        }
+        code {
             background: rgba(0,0,0,0.3);
             padding: 2px 6px;
             border-radius: 4px;
             font-family: 'Courier New', monospace;
-            font-size: 0.95em;
-        }
-        .response-text pre {
-            background: #1e1e1e;
-            padding: 14px;
-            border-radius: 8px;
-            overflow-x: auto;
-            margin: 12px 0;
-            font-size: 0.9rem;
-            border-left: 3px solid #3498db;
         }
         .input-area {
             display: flex;
@@ -146,50 +130,44 @@
             padding: 20px;
             background: rgba(0,0,0,0.3);
             border-radius: 20px;
-            margin-bottom: 12px;
         }
         textarea {
             flex: 1;
-            padding: 14px 18px;
-            border: 2px solid rgba(255,255,255,0.1);
+            padding: 14px;
+            border: none;
             border-radius: 16px;
-            background: rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.1);
             color: #fff;
             font-family: inherit;
             font-size: 1rem;
             resize: none;
             outline: none;
-            transition: border-color 0.2s;
         }
-        textarea:focus { border-color: #3498db; }
-        textarea::placeholder { color: rgba(255,255,255,0.4); }
+        textarea::placeholder {
+            color: rgba(255,255,255,0.5);
+        }
         button {
             padding: 14px 32px;
             background: linear-gradient(135deg, #2ecc71, #27ae60);
             border: none;
             border-radius: 16px;
             color: white;
-            font-weight: 600;
-            font-size: 1rem;
+            font-weight: bold;
             cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
+            transition: transform 0.2s;
         }
         button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(46, 204, 113, 0.4);
+            transform: scale(1.02);
         }
         button:disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             cursor: not-allowed;
-            transform: none;
         }
         .controls {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 20px;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
         }
         .clear-btn {
             background: rgba(231, 76, 60, 0.2);
@@ -199,103 +177,63 @@
             border-radius: 12px;
             color: #fff;
             cursor: pointer;
-            transition: background 0.2s;
         }
-        .clear-btn:hover { background: rgba(231, 76, 60, 0.3); }
         .status {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: #aaa;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
         .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #2ecc71;
-            box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
-        }
-        .status-dot.streaming {
-            background: #f1c40f;
-            box-shadow: 0 0 8px rgba(241, 196, 15, 0.6);
-            animation: pulse 1s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(0.9); }
-        }
-        .cursor {
-            display: inline-block;
-            width: 8px;
-            animation: blink 1s step-end infinite;
-            vertical-align: middle;
-        }
-        @keyframes blink { 50% { opacity: 0; } }
-        .model-info {
-            font-size: 0.75rem;
-            text-align: center;
-            padding: 12px;
-            color: rgba(255,255,255,0.5);
-            border-top: 1px solid rgba(255,255,255,0.05);
-        }
-        .error-msg {
-            color: #e74c3c;
-            font-size: 0.9rem;
-            margin-top: 8px;
-            padding: 10px;
-            background: rgba(231, 76, 60, 0.1);
-            border-radius: 8px;
-            border-left: 3px solid #e74c3c;
-        }
-        .typing-indicator {
-            display: flex;
-            gap: 4px;
-            padding: 8px 0;
-        }
-        .typing-indicator span {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: #76d7c4;
-            animation: bounce 1.4s infinite ease-in-out;
+            background: #2ecc71;
         }
-        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
-        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
-        @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
-            40% { transform: scale(1); opacity: 1; }
+        .status-dot.streaming {
+            background: #f1c40f;
+            animation: pulse 1s infinite;
         }
-        @media (max-width: 768px) {
-            .app { padding: 12px; }
-            h1 { font-size: 2rem; }
-            .message-content { max-width: 95%; }
-            .input-area { flex-direction: column; }
-            button { width: 100%; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .cursor {
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+        .model-info {
+            font-size: 0.7rem;
+            text-align: center;
+            margin-top: 12px;
+            color: #666;
+        }
+        .error-msg {
+            color: #e74c3c;
+            font-size: 0.8rem;
+            margin-top: 8px;
         }
     </style>
 </head>
 <body>
     <div class="app">
         <header>
-            <h1>🦢 Greyswan AI Agent</h1>
-            <p class="subtitle">Powered by NVIDIA Nemotron 3 Super • Step-by-step reasoning</p>
+            <h1>🦢 WhiteSwan AI Agent</h1>
             <div class="badge-container">
-                <span class="badge free">🧠 Nemotron 3 Super 120B</span>
-                <span class="badge reasoning">💭 Reasoning Enabled</span>
-                <span class="badge streaming">⚡ Streaming Response</span>
+                <span class="badge">🧠 NVIDIA Nemotron 3 Super</span>
+                <span class="badge">💬 Streaming + Reasoning</span>
+                <span class="badge">☁️ Cloudflare Worker</span>
             </div>
         </header>
 
-        <div class="chat-area" id="chatArea" aria-live="polite">
+        <div class="chat-area" id="chatArea">
             <div class="message assistant">
                 <div class="message-content">
-                    👋 Hi! I'm <strong>Greyswan</strong>, powered by <strong>NVIDIA Nemotron 3 Super</strong>.<br><br>
-                    I can reason step-by-step through complex problems, write code, analyze data, and more.<br><br>
-                    <em>Try asking:</em><br>
-                    • "Explain quantum computing like I'm 10"<br>
-                    • "Write a Python function to parse JSON with error handling"<br>
-                    • "What's the best approach to optimize this SQL query?"
+                    👋 Hi! I'm WhiteSwan, powered by <strong>NVIDIA Nemotron 3 Super</strong>.<br><br>
+                    I can reason step‑by‑step and answer complex questions. Ask me anything!
                 </div>
             </div>
         </div>
@@ -309,355 +247,211 @@
         </div>
 
         <div class="input-area">
-            <textarea 
-                id="userInput" 
-                placeholder="Ask Greyswan anything... (coding, reasoning, analysis, creative writing)" 
-                rows="2"
-                aria-label="Your message"
-            ></textarea>
+            <textarea id="userInput" placeholder="Ask WhiteSwan anything... (coding, reasoning, analysis)" rows="2"></textarea>
             <button id="sendBtn" onclick="sendMessage()">Send ✨</button>
         </div>
-        
         <div class="model-info">
-            Model: nvidia/nemotron-3-super-120b-a12b • 1M context • Streaming + Reasoning • 
-            <a href="https://github.com/shubhrgs" target="_blank" style="color:#76d7c4;text-decoration:none">by @shubhrgs</a>
+            Model: nvidia/nemotron-3-super-120b-a12b • 1M context • Streaming reasoning
         </div>
     </div>
 
     <script>
-        // 🔧 CONFIGURATION - Update if deploying Worker to custom domain
-        const CONFIG = {
-            API_BASE: 'https://whiteswan.shubhrgs.workers.dev', // ← UPDATE THIS to your Worker URL
-            TIMEOUT_MS: 120000, // 2 minute timeout
-            MAX_RETRIES: 2
-        };
-
-        // State management
-        let sessionId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+        // Configuration
+        const API_BASE = 'https://whiteswan.shubhrgs.workers.dev';
+        const SYSTEM_PROMPT = "You are WhiteSwan, a helpful AI assistant powered by NVIDIA Nemotron 3 Super. Show your step-by-step reasoning when appropriate.";
+        
+        // Conversation state
+        let messages = [];
         let isStreaming = false;
-        let abortController = null;
-
-        // DOM Elements
-        const elements = {
-            chatArea: document.getElementById('chatArea'),
-            userInput: document.getElementById('userInput'),
-            sendBtn: document.getElementById('sendBtn'),
-            statusDot: document.getElementById('statusDot'),
-            statusText: document.getElementById('statusText')
-        };
-
-        // Auto-focus input on load
-        document.addEventListener('DOMContentLoaded', () => {
-            elements.userInput.focus();
-            // Update API_BASE if on same domain as Worker (for local dev)
-            if (window.location.hostname.includes('workers.dev')) {
-                CONFIG.API_BASE = window.location.origin;
+        
+        // Add system prompt if reasoning is enabled (always true for this frontend)
+        function initConversation() {
+            if (messages.length === 0) {
+                messages.push({ role: "system", content: SYSTEM_PROMPT });
             }
-        });
-
-        /**
-         * Send message to Greyswan AI
-         */
+        }
+        
         async function sendMessage() {
-            const message = elements.userInput.value.trim();
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
             if (!message || isStreaming) return;
-
-            // Reset UI state
-            elements.userInput.value = '';
+            
+            input.value = '';
             isStreaming = true;
-            elements.sendBtn.disabled = true;
-            updateStatus('Greyswan is thinking...', true);
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            statusDot.classList.add('streaming');
+            statusText.innerHTML = 'WhiteSwan is thinking...';
             
-            // Add user message to chat
+            // Add user message to UI and history
             addMessage(message, 'user');
+            messages.push({ role: "user", content: message });
             
-            // Create assistant message placeholder
+            // Create placeholder for assistant
             const assistantDiv = addMessage('', 'assistant', true);
             const contentDiv = assistantDiv.querySelector('.message-content');
-            contentDiv.innerHTML = `
-                <div class="typing-indicator">
-                    <span></span><span></span><span></span>
-                </div>
-                <div class="response-text"></div>
-                <span class="cursor">▊</span>
-            `;
+            contentDiv.innerHTML = '<div class="response-text"></div><span class="cursor">▊</span>';
             const responseDiv = contentDiv.querySelector('.response-text');
             let reasoningDiv = null;
             let fullResponse = '';
-            let fullReasoning = '';
-
-            // Setup abort controller for timeout/cancellation
-            abortController = new AbortController();
-            const timeoutId = setTimeout(() => abortController.abort(), CONFIG.TIMEOUT_MS);
-
+            let reasoningBuffer = '';
+            
             try {
-                const response = await fetch(`${CONFIG.API_BASE}/api/chat`, {
+                const response = await fetch(`${API_BASE}/api/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        message: message,
-                        session_id: sessionId,
+                        messages: messages,
                         temperature: 0.7,
                         enable_reasoning: true
-                    }),
-                    signal: abortController.signal
+                    })
                 });
-
-                clearTimeout(timeoutId);
-
-                // Handle HTTP errors
-                if (!response.ok) {
-                    if (response.status === 429) {
-                        throw new Error('Rate limit exceeded. Please wait 60 seconds before trying again.');
-                    } else if (response.status === 401) {
-                        throw new Error('Authentication error. Please contact the administrator.');
-                    } else {
-                        const errorData = await response.json().catch(() => ({}));
-                        throw new Error(errorData.error || `Server error: ${response.status}`);
-                    }
-                }
-
-                // Remove typing indicator
-                const typingIndicator = contentDiv.querySelector('.typing-indicator');
-                if (typingIndicator) typingIndicator.remove();
-
-                // Process SSE stream
+                
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-
+                
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
                     
-                    const chunk = decoder.decode(value, { stream: true });
+                    const chunk = decoder.decode(value);
                     const lines = chunk.split('\n');
                     
                     for (const line of lines) {
-                        if (!line.startsWith('data: ')) continue;
-                        
-                        try {
-                            const data = JSON.parse(line.slice(6));
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.slice(6);
+                            if (dataStr === '[DONE]') continue;
                             
-                            // Handle reasoning chunks (Nemotron-specific)
-                            if (data.reasoning) {
-                                if (!reasoningDiv) {
-                                    reasoningDiv = document.createElement('div');
-                                    reasoningDiv.className = 'reasoning';
-                                    reasoningDiv.innerHTML = `
-                                        <div class="reasoning-label" onclick="toggleReasoning(this)">
-                                            💭 Reasoning process <span style="opacity:0.7;font-weight:normal">(click to toggle)</span>
-                                        </div>
-                                        <div class="reasoning-content"></div>
-                                    `;
-                                    contentDiv.insertBefore(reasoningDiv, responseDiv);
+                            try {
+                                const data = JSON.parse(dataStr);
+                                
+                                if (data.reasoning) {
+                                    if (!reasoningDiv) {
+                                        reasoningDiv = document.createElement('div');
+                                        reasoningDiv.className = 'reasoning';
+                                        reasoningDiv.innerHTML = `
+                                            <div class="reasoning-label" onclick="toggleReasoning(this)">
+                                                💭 Reasoning process (click to toggle)
+                                            </div>
+                                            <div class="reasoning-content" style="display: block;"></div>
+                                        `;
+                                        contentDiv.insertBefore(reasoningDiv, responseDiv);
+                                    }
+                                    const reasoningContent = reasoningDiv.querySelector('.reasoning-content');
+                                    reasoningContent.textContent += data.reasoning;
+                                    reasoningBuffer += data.reasoning;
+                                    autoScroll();
                                 }
-                                const reasoningContent = reasoningDiv.querySelector('.reasoning-content');
-                                reasoningContent.textContent += data.reasoning;
-                                fullReasoning += data.reasoning;
-                                autoScroll();
+                                
+                                if (data.content) {
+                                    fullResponse += data.content;
+                                    responseDiv.textContent = fullResponse;
+                                    autoScroll();
+                                }
+                                
+                                if (data.error) {
+                                    responseDiv.textContent = `⚠️ Error: ${data.error}`;
+                                }
+                            } catch (e) {
+                                console.warn('Parse error:', e);
                             }
-                            
-                            // Handle content chunks
-                            if (data.content) {
-                                fullResponse += data.content;
-                                responseDiv.textContent = fullResponse;
-                                autoScroll();
-                            }
-                            
-                            // Handle errors in stream
-                            if (data.error) {
-                                throw new Error(data.error);
-                            }
-                            
-                        } catch (e) {
-                            if (e.name === 'AbortError') throw e;
-                            console.warn('SSE parse error:', e);
                         }
                     }
                 }
-
-                // Finalize message display
+                
+                // Remove cursor
                 const cursor = contentDiv.querySelector('.cursor');
                 if (cursor) cursor.remove();
                 
-                // Show fallback if no content received
-                if (!fullResponse.trim() && !fullReasoning.trim()) {
-                    responseDiv.textContent = '⚠️ No response received. The model may be busy or rate-limited. Please try again in a moment.';
-                    responseDiv.style.color = '#f39c12';
+                if (!fullResponse && !reasoningBuffer) {
+                    responseDiv.textContent = 'No response received. The API may be rate-limited. Please try again.';
                 }
-
+                
+                // Save assistant response to history
+                if (fullResponse) {
+                    messages.push({ role: "assistant", content: fullResponse });
+                }
+                
+                // Trim conversation history (keep last 30 messages)
+                if (messages.length > 30) {
+                    // Keep system prompt + last 29 messages
+                    const systemMsg = messages[0];
+                    messages = [systemMsg, ...messages.slice(-29)];
+                }
+                
             } catch (error) {
-                console.error('Chat error:', error);
-                clearTimeout(timeoutId);
-                
-                // Clean up UI on error
-                contentDiv.innerHTML = '';
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'error-msg';
-                errorDiv.textContent = `⚠️ ${error.message || 'Connection error. Please check your internet and try again.'}`;
-                contentDiv.appendChild(errorDiv);
-                
-                // Add retry suggestion for certain errors
-                if (error.message?.includes('Rate limit')) {
-                    const retryHint = document.createElement('div');
-                    retryHint.style.marginTop = '8px';
-                    retryHint.style.fontSize = '0.85rem';
-                    retryHint.style.opacity = '0.8';
-                    retryHint.innerHTML = '💡 <button onclick="sendMessage()" style="background:none;border:none;color:#3498db;cursor:pointer;padding:0;font:inherit;text-decoration:underline">Retry now</button> or wait 60 seconds';
-                    contentDiv.appendChild(retryHint);
-                }
-                
+                console.error('Fetch error:', error);
+                contentDiv.innerHTML = `<em>⚠️ Network error: ${error.message}. Please check your connection.</em>`;
             } finally {
-                // Reset UI state
                 isStreaming = false;
-                elements.sendBtn.disabled = false;
-                updateStatus('Ready', false);
-                elements.userInput.focus();
-                abortController = null;
+                sendBtn.disabled = false;
+                statusDot.classList.remove('streaming');
+                statusText.innerHTML = 'Ready';
+                document.getElementById('userInput').focus();
             }
         }
-
-        /**
-         * Toggle reasoning section visibility
-         */
+        
         function toggleReasoning(labelElement) {
             const reasoningDiv = labelElement.parentElement;
             const content = reasoningDiv.querySelector('.reasoning-content');
-            const isCollapsed = content.classList.toggle('collapsed');
-            
-            if (isCollapsed) {
-                labelElement.innerHTML = '💭 Reasoning process <span style="opacity:0.7;font-weight:normal">(click to show)</span>';
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                labelElement.innerHTML = '💭 Reasoning process (click to toggle)';
             } else {
-                labelElement.innerHTML = '💭 Reasoning process <span style="opacity:0.7;font-weight:normal">(click to toggle)</span>';
+                content.style.display = 'none';
+                labelElement.innerHTML = '💭 Reasoning process (click to show)';
             }
         }
-
-        /**
-         * Add message to chat area
-         */
+        
+        function autoScroll() {
+            const chatArea = document.getElementById('chatArea');
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+        
         function addMessage(content, role, isPlaceholder = false) {
+            const chatArea = document.getElementById('chatArea');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
-            
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
-            
             if (!isPlaceholder) {
-                // Basic markdown-like formatting for user messages
-                contentDiv.innerHTML = formatMessage(content);
+                contentDiv.textContent = content;
             }
-            
             messageDiv.appendChild(contentDiv);
-            elements.chatArea.appendChild(messageDiv);
+            chatArea.appendChild(messageDiv);
             autoScroll();
             return messageDiv;
         }
-
-        /**
-         * Simple message formatting (code blocks, line breaks)
-         */
-        function formatMessage(text) {
-            // Escape HTML first
-            let formatted = text
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-            
-            // Code blocks: ```code```
-            formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-            
-            // Inline code: `code`
-            formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
-            
-            // Line breaks
-            formatted = formatted.replace(/\n/g, '<br>');
-            
-            return formatted;
-        }
-
-        /**
-         * Auto-scroll chat to bottom
-         */
-        function autoScroll() {
-            elements.chatArea.scrollTop = elements.chatArea.scrollHeight;
-        }
-
-        /**
-         * Update status indicator
-         */
-        function updateStatus(text, isStreaming) {
-            elements.statusText.textContent = text;
-            elements.statusDot.classList.toggle('streaming', isStreaming);
-        }
-
-        /**
-         * Clear conversation history
-         */
-        async function clearConversation() {
-            if (!confirm('Clear the entire conversation history? This cannot be undone.')) return;
-            
-            // Optimistic UI update
-            elements.chatArea.innerHTML = `
-                <div class="message assistant">
-                    <div class="message-content">
-                        🧹 Conversation cleared! How can I help you now?
+        
+        function clearConversation() {
+            if (confirm('Clear the conversation history?')) {
+                // Reset messages with system prompt
+                messages = [];
+                initConversation();
+                
+                const chatArea = document.getElementById('chatArea');
+                chatArea.innerHTML = `
+                    <div class="message assistant">
+                        <div class="message-content">
+                            🧹 Conversation cleared. How can I help you now?
+                        </div>
                     </div>
-                </div>
-            `;
-            
-            // Generate new session ID
-            sessionId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-            
-            // Notify backend to clear stored history (if KV enabled)
-            try {
-                await fetch(`${CONFIG.API_BASE}/api/clear`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: sessionId })
-                });
-            } catch (error) {
-                console.warn('Failed to clear backend history:', error);
-                // Continue anyway - frontend is cleared
+                `;
             }
         }
-
-        // Keyboard shortcuts
-        elements.userInput.addEventListener('keydown', (e) => {
-            // Enter to send (Shift+Enter for newline)
+        
+        // Initialize conversation on page load
+        initConversation();
+        
+        // Enter to send, Shift+Enter for newline
+        document.getElementById('userInput').addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
             }
-            // Escape to cancel streaming
-            if (e.key === 'Escape' && isStreaming && abortController) {
-                abortController.abort();
-                updateStatus('Cancelled', false);
-                isStreaming = false;
-                elements.sendBtn.disabled = false;
-            }
         });
-
-        // Handle page visibility changes (pause streaming when tab hidden)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden && isStreaming && abortController) {
-                // Optional: abort streaming when tab is hidden to save resources
-                // abortController.abort();
-            }
-        });
-
-        // Graceful degradation for older browsers
-        if (!window.ReadableStream) {
-            elements.chatArea.innerHTML = `
-                <div class="message assistant">
-                    <div class="message-content error-msg">
-                        ⚠️ Your browser doesn't support streaming responses.<br><br>
-                        Please update to a modern browser (Chrome 105+, Firefox 117+, Safari 18+, or Edge 105+) for the best experience.
-                    </div>
-                </div>
-            `;
-            elements.sendBtn.disabled = true;
-            elements.userInput.placeholder = 'Browser not supported for streaming';
-        }
     </script>
 </body>
 </html>
