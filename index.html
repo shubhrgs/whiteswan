@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhiteSwan AI - Real‑time Reasoning</title>
     <style>
-        /* (same styles as before) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -187,22 +186,6 @@
             margin-top: 12px;
             color: #666;
         }
-        .debug-panel {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.8);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 10px;
-            color: #0f0;
-            max-width: 300px;
-            max-height: 150px;
-            overflow-y: auto;
-            z-index: 1000;
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -239,7 +222,6 @@
         </div>
         <div class="model-info">nvidia/nemotron-3-super-120b-a12b • Streaming reasoning word‑by‑word</div>
     </div>
-    <div class="debug-panel" id="debugPanel"></div>
 
     <script>
         const API_BASE = 'https://whiteswan.shubhrgs.workers.dev';
@@ -248,25 +230,15 @@
         let messages = [];
         let isStreaming = false;
 
-        function debugLog(msg) {
-            const panel = document.getElementById('debugPanel');
-            panel.style.display = 'block';
-            const entry = document.createElement('div');
-            entry.textContent = new Date().toLocaleTimeString() + ' ' + msg;
-            panel.appendChild(entry);
-            panel.scrollTop = panel.scrollHeight;
-            if (panel.children.length > 20) panel.removeChild(panel.children[0]);
-            console.log(msg);
-        }
-
         function initConversation() {
             if (messages.length === 0) {
                 messages.push({ role: "system", content: SYSTEM_PROMPT });
             }
         }
 
-        async function yieldToUI() {
-            await new Promise(resolve => setTimeout(resolve, 0));
+        // Force a repaint by reading a layout property
+        function forceRepaint() {
+            document.body.offsetHeight;
         }
 
         async function sendMessage() {
@@ -288,17 +260,18 @@
             
             const assistantDiv = addMessage('', 'assistant', true);
             const contentDiv = assistantDiv.querySelector('.message-content');
-            contentDiv.innerHTML = '<div class="thinking-placeholder">💭 WhiteSwan is thinking <span class="cursor">▊</span></div><div class="response-text" style="display:none;"></div>';
+            // Start with thinking placeholder
+            contentDiv.innerHTML = '<div class="thinking-placeholder">💭 WhiteSwan is thinking <span class="cursor">▊</span></div>';
             const thinkingDiv = contentDiv.querySelector('.thinking-placeholder');
-            const responseDiv = contentDiv.querySelector('.response-text');
             
             let reasoningDiv = null;
             let reasoningContentElem = null;
+            let responseDiv = null;
             let fullResponse = '';
-            let firstReasoning = true;
+            let reasoningBuffer = '';
+            let reasoningStarted = false;
             
             try {
-                debugLog('Sending request to ' + API_BASE + '/api/chat');
                 const response = await fetch(`${API_BASE}/api/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -309,11 +282,8 @@
                     })
                 });
                 
-                debugLog('Response status: ' + response.status);
                 if (!response.ok) {
-                    const errText = await response.text();
-                    debugLog('Error response: ' + errText);
-                    throw new Error(`HTTP ${response.status}: ${errText}`);
+                    throw new Error(`HTTP ${response.status}`);
                 }
                 
                 const reader = response.body.getReader();
@@ -324,32 +294,27 @@
                     const { done, value } = await reader.read();
                     if (done) break;
                     
-                    const chunkStr = decoder.decode(value, { stream: true });
-                    debugLog(`Chunk (${chunkStr.length} bytes): ${chunkStr.substring(0, 80)}...`);
-                    buffer += chunkStr;
+                    buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
                     buffer = lines.pop() || '';
                     
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
                             const dataStr = line.slice(6);
-                            if (dataStr === '[DONE]') {
-                                debugLog('Received [DONE]');
-                                continue;
-                            }
+                            if (dataStr === '[DONE]') continue;
                             try {
                                 const data = JSON.parse(dataStr);
                                 const delta = data.choices?.[0]?.delta;
                                 if (!delta) continue;
                                 
+                                // Handle reasoning_content
                                 if (delta.reasoning_content) {
-                                    debugLog(`Reasoning chunk: ${delta.reasoning_content.length} chars`);
-                                    if (firstReasoning) {
-                                        firstReasoning = false;
-                                        if (thinkingDiv) thinkingDiv.style.display = 'none';
-                                        responseDiv.style.display = 'block';
-                                        await yieldToUI();
+                                    if (!reasoningStarted) {
+                                        reasoningStarted = true;
+                                        // Hide thinking placeholder and create reasoning + response containers
+                                        thinkingDiv.style.display = 'none';
                                         
+                                        // Create reasoning box
                                         reasoningDiv = document.createElement('div');
                                         reasoningDiv.className = 'reasoning';
                                         reasoningDiv.innerHTML = `
@@ -358,45 +323,53 @@
                                             </div>
                                             <div class="reasoning-content"></div>
                                         `;
-                                        contentDiv.insertBefore(reasoningDiv, responseDiv);
+                                        contentDiv.appendChild(reasoningDiv);
                                         reasoningContentElem = reasoningDiv.querySelector('.reasoning-content');
-                                        await yieldToUI();
+                                        
+                                        // Create response container
+                                        responseDiv = document.createElement('div');
+                                        responseDiv.className = 'response-text';
+                                        contentDiv.appendChild(responseDiv);
+                                        
+                                        forceRepaint();
                                     }
                                     reasoningContentElem.textContent += delta.reasoning_content;
+                                    reasoningBuffer += delta.reasoning_content;
+                                    forceRepaint();
                                     autoScroll();
-                                    await yieldToUI();
                                 }
                                 
+                                // Handle content
                                 if (delta.content) {
-                                    debugLog(`Content chunk: ${delta.content.length} chars`);
-                                    if (firstReasoning && thinkingDiv) {
+                                    if (!reasoningStarted) {
+                                        // No reasoning, just show response
                                         thinkingDiv.style.display = 'none';
-                                        responseDiv.style.display = 'block';
-                                        await yieldToUI();
-                                        firstReasoning = false;
+                                        responseDiv = document.createElement('div');
+                                        responseDiv.className = 'response-text';
+                                        contentDiv.appendChild(responseDiv);
+                                        reasoningStarted = true; // prevent re-creation
+                                        forceRepaint();
                                     }
                                     fullResponse += delta.content;
-                                    responseDiv.textContent = fullResponse;
-                                    autoScroll();
-                                    await yieldToUI();
+                                    if (responseDiv) {
+                                        responseDiv.textContent = fullResponse;
+                                        forceRepaint();
+                                        autoScroll();
+                                    }
                                 }
                             } catch (e) {
-                                debugLog(`Parse error: ${e.message} - line: ${line}`);
+                                console.warn(e);
                             }
-                        } else if (line.trim()) {
-                            debugLog(`Non-data line: ${line}`);
                         }
                     }
                 }
                 
-                if (thinkingDiv) thinkingDiv.remove();
+                // Clean up cursor if still present
                 const cursor = contentDiv.querySelector('.cursor');
                 if (cursor) cursor.remove();
                 
-                if (!fullResponse && !reasoningDiv) {
-                    responseDiv.textContent = 'No response received. The API may be rate-limited.';
-                    responseDiv.style.display = 'block';
-                    debugLog('No reasoning or content received');
+                if (!fullResponse && !reasoningBuffer) {
+                    contentDiv.innerHTML = '<em>No response received. API may be rate-limited.</em>';
                 }
                 
                 if (fullResponse) {
@@ -407,7 +380,7 @@
                 }
                 
             } catch (error) {
-                debugLog(`Network error: ${error.message}`);
+                console.error(error);
                 contentDiv.innerHTML = `<em>⚠️ Network error: ${error.message}</em>`;
             } finally {
                 isStreaming = false;
