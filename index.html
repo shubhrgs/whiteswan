@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhiteSwan AI - Real‑time Reasoning (Native SSE)</title>
+    <title>WhiteSwan AI - Real‑time Reasoning</title>
     <style>
+        /* (same styles as before) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -186,6 +187,22 @@
             margin-top: 12px;
             color: #666;
         }
+        .debug-panel {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 10px;
+            color: #0f0;
+            max-width: 300px;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -194,7 +211,7 @@
             <h1>🦢 WhiteSwan AI Agent</h1>
             <div class="badge-container">
                 <span class="badge">🧠 NVIDIA Nemotron 3 Super</span>
-                <span class="badge">⚡ Native SSE Streaming</span>
+                <span class="badge">⚡ Real‑time Reasoning</span>
                 <span class="badge">☁️ Cloudflare Proxy</span>
             </div>
         </header>
@@ -222,6 +239,7 @@
         </div>
         <div class="model-info">nvidia/nemotron-3-super-120b-a12b • Streaming reasoning word‑by‑word</div>
     </div>
+    <div class="debug-panel" id="debugPanel"></div>
 
     <script>
         const API_BASE = 'https://whiteswan.shubhrgs.workers.dev';
@@ -229,6 +247,17 @@
         
         let messages = [];
         let isStreaming = false;
+
+        function debugLog(msg) {
+            const panel = document.getElementById('debugPanel');
+            panel.style.display = 'block';
+            const entry = document.createElement('div');
+            entry.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+            panel.appendChild(entry);
+            panel.scrollTop = panel.scrollHeight;
+            if (panel.children.length > 20) panel.removeChild(panel.children[0]);
+            console.log(msg);
+        }
 
         function initConversation() {
             if (messages.length === 0) {
@@ -269,6 +298,7 @@
             let firstReasoning = true;
             
             try {
+                debugLog('Sending request to ' + API_BASE + '/api/chat');
                 const response = await fetch(`${API_BASE}/api/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -279,6 +309,13 @@
                     })
                 });
                 
+                debugLog('Response status: ' + response.status);
+                if (!response.ok) {
+                    const errText = await response.text();
+                    debugLog('Error response: ' + errText);
+                    throw new Error(`HTTP ${response.status}: ${errText}`);
+                }
+                
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
@@ -287,21 +324,26 @@
                     const { done, value } = await reader.read();
                     if (done) break;
                     
-                    buffer += decoder.decode(value, { stream: true });
+                    const chunkStr = decoder.decode(value, { stream: true });
+                    debugLog(`Chunk (${chunkStr.length} bytes): ${chunkStr.substring(0, 80)}...`);
+                    buffer += chunkStr;
                     const lines = buffer.split('\n');
                     buffer = lines.pop() || '';
                     
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
                             const dataStr = line.slice(6);
-                            if (dataStr === '[DONE]') continue;
+                            if (dataStr === '[DONE]') {
+                                debugLog('Received [DONE]');
+                                continue;
+                            }
                             try {
                                 const data = JSON.parse(dataStr);
                                 const delta = data.choices?.[0]?.delta;
                                 if (!delta) continue;
                                 
-                                // Handle reasoning_content (NVIDIA's field)
                                 if (delta.reasoning_content) {
+                                    debugLog(`Reasoning chunk: ${delta.reasoning_content.length} chars`);
                                     if (firstReasoning) {
                                         firstReasoning = false;
                                         if (thinkingDiv) thinkingDiv.style.display = 'none';
@@ -322,11 +364,11 @@
                                     }
                                     reasoningContentElem.textContent += delta.reasoning_content;
                                     autoScroll();
-                                    await yieldToUI(); // Force repaint after each reasoning chunk
+                                    await yieldToUI();
                                 }
                                 
-                                // Handle content
                                 if (delta.content) {
+                                    debugLog(`Content chunk: ${delta.content.length} chars`);
                                     if (firstReasoning && thinkingDiv) {
                                         thinkingDiv.style.display = 'none';
                                         responseDiv.style.display = 'block';
@@ -336,11 +378,13 @@
                                     fullResponse += delta.content;
                                     responseDiv.textContent = fullResponse;
                                     autoScroll();
-                                    await yieldToUI(); // Force repaint after each content chunk
+                                    await yieldToUI();
                                 }
                             } catch (e) {
-                                console.warn('Parse error:', e);
+                                debugLog(`Parse error: ${e.message} - line: ${line}`);
                             }
+                        } else if (line.trim()) {
+                            debugLog(`Non-data line: ${line}`);
                         }
                     }
                 }
@@ -350,8 +394,9 @@
                 if (cursor) cursor.remove();
                 
                 if (!fullResponse && !reasoningDiv) {
-                    responseDiv.textContent = 'No response received.';
+                    responseDiv.textContent = 'No response received. The API may be rate-limited.';
                     responseDiv.style.display = 'block';
+                    debugLog('No reasoning or content received');
                 }
                 
                 if (fullResponse) {
@@ -362,7 +407,7 @@
                 }
                 
             } catch (error) {
-                console.error(error);
+                debugLog(`Network error: ${error.message}`);
                 contentDiv.innerHTML = `<em>⚠️ Network error: ${error.message}</em>`;
             } finally {
                 isStreaming = false;
