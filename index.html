@@ -236,8 +236,16 @@
             }
         }
 
-        // Helper to yield to browser for repaint
-        const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
+        // Force a repaint by reading layout properties and yielding
+        async function forceRepaint() {
+            await new Promise(resolve => {
+                requestAnimationFrame(() => {
+                    // Force a synchronous layout flush
+                    document.body.offsetHeight;
+                    resolve();
+                });
+            });
+        }
 
         async function sendMessage() {
             const input = document.getElementById('userInput');
@@ -263,8 +271,8 @@
             const responseDiv = contentDiv.querySelector('.response-text');
             
             let reasoningDiv = null;
-            let fullResponse = '';
             let reasoningContentElem = null;
+            let fullResponse = '';
             
             try {
                 const response = await fetch(`${API_BASE}/api/chat`, {
@@ -297,12 +305,11 @@
                                 const data = JSON.parse(dataStr);
                                 
                                 if (data.reasoning) {
-                                    // Hide thinking placeholder on first reasoning
                                     if (thinkingDiv && thinkingDiv.style.display !== 'none') {
                                         thinkingDiv.style.display = 'none';
                                         responseDiv.style.display = 'block';
+                                        await forceRepaint();
                                     }
-                                    // Create reasoning box if not exists
                                     if (!reasoningDiv) {
                                         reasoningDiv = document.createElement('div');
                                         reasoningDiv.className = 'reasoning';
@@ -314,28 +321,23 @@
                                         `;
                                         contentDiv.insertBefore(reasoningDiv, responseDiv);
                                         reasoningContentElem = reasoningDiv.querySelector('.reasoning-content');
-                                        // Force a reflow to ensure the element is painted
-                                        reasoningContentElem.offsetHeight;
+                                        await forceRepaint();
                                     }
-                                    // Append reasoning chunk
-                                    if (reasoningContentElem) {
-                                        reasoningContentElem.textContent += data.reasoning;
-                                        // Yield to browser to repaint
-                                        await yieldToBrowser();
-                                    }
+                                    reasoningContentElem.textContent += data.reasoning;
                                     autoScroll();
+                                    await forceRepaint();
                                 }
                                 
                                 if (data.content) {
                                     if (thinkingDiv && thinkingDiv.style.display !== 'none') {
                                         thinkingDiv.style.display = 'none';
                                         responseDiv.style.display = 'block';
+                                        await forceRepaint();
                                     }
                                     fullResponse += data.content;
                                     responseDiv.textContent = fullResponse;
-                                    // Yield to browser for content updates as well
-                                    await yieldToBrowser();
                                     autoScroll();
+                                    await forceRepaint();
                                 }
                                 
                                 if (data.error) {
@@ -343,20 +345,17 @@
                                     responseDiv.style.display = 'block';
                                     if (thinkingDiv) thinkingDiv.style.display = 'none';
                                 }
-                            } catch (e) {
-                                // Ignore parse errors
-                            }
+                            } catch (e) {}
                         }
                     }
                 }
                 
-                // Clean up
                 if (thinkingDiv) thinkingDiv.remove();
                 const cursor = contentDiv.querySelector('.cursor');
                 if (cursor) cursor.remove();
                 
                 if (!fullResponse && !reasoningDiv) {
-                    responseDiv.textContent = 'No response received. The API may be rate-limited.';
+                    responseDiv.textContent = 'No response received.';
                     responseDiv.style.display = 'block';
                 }
                 
@@ -368,7 +367,7 @@
                 }
                 
             } catch (error) {
-                console.error('Fetch error:', error);
+                console.error(error);
                 contentDiv.innerHTML = `<em>⚠️ Network error: ${error.message}</em>`;
             } finally {
                 isStreaming = false;
