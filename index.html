@@ -195,7 +195,7 @@
             <div class="badge-container">
                 <span class="badge">🧠 NVIDIA Nemotron 3 Super</span>
                 <span class="badge">⚡ Real‑time Reasoning</span>
-                <span class="badge">☁️ Cloudflare Proxy</span>
+                <span class="badge">☁️ Cloudflare Worker</span>
             </div>
         </header>
 
@@ -236,11 +236,6 @@
             }
         }
 
-        // Force a repaint by reading a layout property
-        function forceRepaint() {
-            document.body.offsetHeight;
-        }
-
         async function sendMessage() {
             const input = document.getElementById('userInput');
             const message = input.value.trim();
@@ -255,21 +250,19 @@
             statusDot.classList.add('streaming');
             statusText.innerHTML = 'WhiteSwan is thinking...';
             
+            // Add user message to UI and history
             addMessage(message, 'user');
             messages.push({ role: "user", content: message });
             
+            // Create assistant message placeholder with thinking indicator
             const assistantDiv = addMessage('', 'assistant', true);
             const contentDiv = assistantDiv.querySelector('.message-content');
-            // Start with thinking placeholder
-            contentDiv.innerHTML = '<div class="thinking-placeholder">💭 WhiteSwan is thinking <span class="cursor">▊</span></div>';
+            contentDiv.innerHTML = '<div class="thinking-placeholder">💭 WhiteSwan is thinking <span class="cursor">▊</span></div><div class="response-text" style="display:none;"></div>';
             const thinkingDiv = contentDiv.querySelector('.thinking-placeholder');
+            const responseDiv = contentDiv.querySelector('.response-text');
             
             let reasoningDiv = null;
-            let reasoningContentElem = null;
-            let responseDiv = null;
             let fullResponse = '';
-            let reasoningBuffer = '';
-            let reasoningStarted = false;
             
             try {
                 const response = await fetch(`${API_BASE}/api/chat`, {
@@ -281,10 +274,6 @@
                         enable_reasoning: true
                     })
                 });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
                 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -304,17 +293,16 @@
                             if (dataStr === '[DONE]') continue;
                             try {
                                 const data = JSON.parse(dataStr);
-                                const delta = data.choices?.[0]?.delta;
-                                if (!delta) continue;
                                 
-                                // Handle reasoning_content
-                                if (delta.reasoning_content) {
-                                    if (!reasoningStarted) {
-                                        reasoningStarted = true;
-                                        // Hide thinking placeholder and create reasoning + response containers
+                                // Handle reasoning chunks – show immediately
+                                if (data.reasoning) {
+                                    // Hide thinking placeholder on first reasoning
+                                    if (thinkingDiv && thinkingDiv.style.display !== 'none') {
                                         thinkingDiv.style.display = 'none';
-                                        
-                                        // Create reasoning box
+                                        responseDiv.style.display = 'block';
+                                    }
+                                    // Create reasoning box if not exists
+                                    if (!reasoningDiv) {
                                         reasoningDiv = document.createElement('div');
                                         reasoningDiv.className = 'reasoning';
                                         reasoningDiv.innerHTML = `
@@ -323,64 +311,58 @@
                                             </div>
                                             <div class="reasoning-content"></div>
                                         `;
-                                        contentDiv.appendChild(reasoningDiv);
-                                        reasoningContentElem = reasoningDiv.querySelector('.reasoning-content');
-                                        
-                                        // Create response container
-                                        responseDiv = document.createElement('div');
-                                        responseDiv.className = 'response-text';
-                                        contentDiv.appendChild(responseDiv);
-                                        
-                                        forceRepaint();
+                                        contentDiv.insertBefore(reasoningDiv, responseDiv);
                                     }
-                                    reasoningContentElem.textContent += delta.reasoning_content;
-                                    reasoningBuffer += delta.reasoning_content;
-                                    forceRepaint();
+                                    const reasoningContent = reasoningDiv.querySelector('.reasoning-content');
+                                    reasoningContent.textContent += data.reasoning;
                                     autoScroll();
                                 }
                                 
-                                // Handle content
-                                if (delta.content) {
-                                    if (!reasoningStarted) {
-                                        // No reasoning, just show response
+                                // Handle content chunks – show immediately
+                                if (data.content) {
+                                    if (thinkingDiv && thinkingDiv.style.display !== 'none') {
                                         thinkingDiv.style.display = 'none';
-                                        responseDiv = document.createElement('div');
-                                        responseDiv.className = 'response-text';
-                                        contentDiv.appendChild(responseDiv);
-                                        reasoningStarted = true; // prevent re-creation
-                                        forceRepaint();
+                                        responseDiv.style.display = 'block';
                                     }
-                                    fullResponse += delta.content;
-                                    if (responseDiv) {
-                                        responseDiv.textContent = fullResponse;
-                                        forceRepaint();
-                                        autoScroll();
-                                    }
+                                    fullResponse += data.content;
+                                    responseDiv.textContent = fullResponse;
+                                    autoScroll();
+                                }
+                                
+                                if (data.error) {
+                                    responseDiv.textContent = `⚠️ Error: ${data.error}`;
+                                    responseDiv.style.display = 'block';
+                                    if (thinkingDiv) thinkingDiv.style.display = 'none';
                                 }
                             } catch (e) {
-                                console.warn(e);
+                                console.warn('Parse error:', e);
                             }
                         }
                     }
                 }
                 
-                // Clean up cursor if still present
+                // Clean up cursor and placeholder
+                if (thinkingDiv) thinkingDiv.remove();
                 const cursor = contentDiv.querySelector('.cursor');
                 if (cursor) cursor.remove();
                 
-                if (!fullResponse && !reasoningBuffer) {
-                    contentDiv.innerHTML = '<em>No response received. API may be rate-limited.</em>';
+                if (!fullResponse && !reasoningDiv) {
+                    responseDiv.textContent = 'No response received. API may be rate-limited.';
+                    responseDiv.style.display = 'block';
                 }
                 
+                // Save assistant response to history
                 if (fullResponse) {
                     messages.push({ role: "assistant", content: fullResponse });
                 }
+                
+                // Trim conversation history (keep system + last 29)
                 if (messages.length > 30) {
                     messages = [messages[0], ...messages.slice(-29)];
                 }
                 
             } catch (error) {
-                console.error(error);
+                console.error('Fetch error:', error);
                 contentDiv.innerHTML = `<em>⚠️ Network error: ${error.message}</em>`;
             } finally {
                 isStreaming = false;
