@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhiteSwan AI - Real‑time Reasoning (Debug)</title>
+    <title>WhiteSwan AI - Real‑time Reasoning</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -186,22 +186,6 @@
             margin-top: 12px;
             color: #666;
         }
-        .debug-panel {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.8);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 10px;
-            color: #0f0;
-            max-width: 300px;
-            max-height: 150px;
-            overflow-y: auto;
-            z-index: 1000;
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -210,7 +194,7 @@
             <h1>🦢 WhiteSwan AI Agent</h1>
             <div class="badge-container">
                 <span class="badge">🧠 NVIDIA Nemotron 3 Super</span>
-                <span class="badge">⚡ Real‑time Reasoning</span>
+                <span class="badge">⚡ Word‑by‑word Reasoning</span>
                 <span class="badge">☁️ Cloudflare Worker</span>
             </div>
         </header>
@@ -238,7 +222,6 @@
         </div>
         <div class="model-info">nvidia/nemotron-3-super-120b-a12b • Streaming reasoning word‑by‑word</div>
     </div>
-    <div class="debug-panel" id="debugPanel"></div>
 
     <script>
         const API_BASE = 'https://whiteswan.shubhrgs.workers.dev';
@@ -247,23 +230,14 @@
         let messages = [];
         let isStreaming = false;
 
-        // Debug logging
-        function debugLog(msg) {
-            const panel = document.getElementById('debugPanel');
-            panel.style.display = 'block';
-            const entry = document.createElement('div');
-            entry.textContent = new Date().toLocaleTimeString() + ' ' + msg;
-            panel.appendChild(entry);
-            panel.scrollTop = panel.scrollHeight;
-            if (panel.children.length > 20) panel.removeChild(panel.children[0]);
-            console.log(msg);
-        }
-
         function initConversation() {
             if (messages.length === 0) {
                 messages.push({ role: "system", content: SYSTEM_PROMPT });
             }
         }
+
+        // Helper to yield to browser for repaint
+        const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
 
         async function sendMessage() {
             const input = document.getElementById('userInput');
@@ -290,10 +264,9 @@
             
             let reasoningDiv = null;
             let fullResponse = '';
-            let reasoningReceived = false;
+            let reasoningContentElem = null;
             
             try {
-                debugLog('Sending request to ' + API_BASE + '/api/chat');
                 const response = await fetch(`${API_BASE}/api/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -312,9 +285,7 @@
                     const { done, value } = await reader.read();
                     if (done) break;
                     
-                    const chunkStr = decoder.decode(value, { stream: true });
-                    debugLog(`Raw chunk (${chunkStr.length} bytes): ${chunkStr.substring(0, 50)}...`);
-                    buffer += chunkStr;
+                    buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
                     buffer = lines.pop() || '';
                     
@@ -324,14 +295,14 @@
                             if (dataStr === '[DONE]') continue;
                             try {
                                 const data = JSON.parse(dataStr);
-                                debugLog(`Parsed: ${JSON.stringify(data)}`);
                                 
                                 if (data.reasoning) {
-                                    reasoningReceived = true;
+                                    // Hide thinking placeholder on first reasoning
                                     if (thinkingDiv && thinkingDiv.style.display !== 'none') {
                                         thinkingDiv.style.display = 'none';
                                         responseDiv.style.display = 'block';
                                     }
+                                    // Create reasoning box if not exists
                                     if (!reasoningDiv) {
                                         reasoningDiv = document.createElement('div');
                                         reasoningDiv.className = 'reasoning';
@@ -342,10 +313,16 @@
                                             <div class="reasoning-content"></div>
                                         `;
                                         contentDiv.insertBefore(reasoningDiv, responseDiv);
-                                        debugLog('Created reasoning box');
+                                        reasoningContentElem = reasoningDiv.querySelector('.reasoning-content');
+                                        // Force a reflow to ensure the element is painted
+                                        reasoningContentElem.offsetHeight;
                                     }
-                                    const reasoningContent = reasoningDiv.querySelector('.reasoning-content');
-                                    reasoningContent.textContent += data.reasoning;
+                                    // Append reasoning chunk
+                                    if (reasoningContentElem) {
+                                        reasoningContentElem.textContent += data.reasoning;
+                                        // Yield to browser to repaint
+                                        await yieldToBrowser();
+                                    }
                                     autoScroll();
                                 }
                                 
@@ -356,32 +333,31 @@
                                     }
                                     fullResponse += data.content;
                                     responseDiv.textContent = fullResponse;
+                                    // Yield to browser for content updates as well
+                                    await yieldToBrowser();
                                     autoScroll();
                                 }
                                 
                                 if (data.error) {
-                                    debugLog(`Error: ${data.error}`);
                                     responseDiv.textContent = `⚠️ Error: ${data.error}`;
                                     responseDiv.style.display = 'block';
                                     if (thinkingDiv) thinkingDiv.style.display = 'none';
                                 }
                             } catch (e) {
-                                debugLog(`Parse error: ${e.message} on line: ${line}`);
+                                // Ignore parse errors
                             }
-                        } else if (line.startsWith(': ')) {
-                            debugLog(`Heartbeat: ${line}`);
                         }
                     }
                 }
                 
+                // Clean up
                 if (thinkingDiv) thinkingDiv.remove();
                 const cursor = contentDiv.querySelector('.cursor');
                 if (cursor) cursor.remove();
                 
-                if (!fullResponse && !reasoningReceived) {
-                    responseDiv.textContent = 'No response received. The API may be rate-limited or reasoning not available.';
+                if (!fullResponse && !reasoningDiv) {
+                    responseDiv.textContent = 'No response received. The API may be rate-limited.';
                     responseDiv.style.display = 'block';
-                    debugLog('No reasoning or content received');
                 }
                 
                 if (fullResponse) {
@@ -392,7 +368,7 @@
                 }
                 
             } catch (error) {
-                debugLog(`Network error: ${error.message}`);
+                console.error('Fetch error:', error);
                 contentDiv.innerHTML = `<em>⚠️ Network error: ${error.message}</em>`;
             } finally {
                 isStreaming = false;
@@ -455,12 +431,6 @@
                 sendMessage();
             }
         });
-        
-        // Optional: hide debug panel after 10 seconds
-        setTimeout(() => {
-            const panel = document.getElementById('debugPanel');
-            if (panel) panel.style.opacity = '0.5';
-        }, 5000);
     </script>
 </body>
 </html>
