@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhiteSwan AI - Real‑time Reasoning</title>
+    <title>WhiteSwan AI - Real‑time Reasoning (Native SSE)</title>
     <style>
-        /* (same styles as before – keep them) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -195,8 +194,8 @@
             <h1>🦢 WhiteSwan AI Agent</h1>
             <div class="badge-container">
                 <span class="badge">🧠 NVIDIA Nemotron 3 Super</span>
-                <span class="badge">⚡ Real‑time Reasoning</span>
-                <span class="badge">☁️ Cloudflare Worker</span>
+                <span class="badge">⚡ Native SSE Streaming</span>
+                <span class="badge">☁️ Cloudflare Proxy</span>
             </div>
         </header>
 
@@ -237,7 +236,6 @@
             }
         }
 
-        // Force a repaint by yielding to the event loop
         async function yieldToUI() {
             await new Promise(resolve => setTimeout(resolve, 0));
         }
@@ -294,22 +292,21 @@
                     buffer = lines.pop() || '';
                     
                     for (const line of lines) {
-                        // Skip heartbeat comments
-                        if (line.startsWith(': ')) continue;
-                        
                         if (line.startsWith('data: ')) {
                             const dataStr = line.slice(6);
                             if (dataStr === '[DONE]') continue;
                             try {
                                 const data = JSON.parse(dataStr);
+                                const delta = data.choices?.[0]?.delta;
+                                if (!delta) continue;
                                 
-                                if (data.reasoning) {
-                                    // On first reasoning chunk, hide thinking placeholder and create reasoning box
+                                // Handle reasoning_content (NVIDIA's field)
+                                if (delta.reasoning_content) {
                                     if (firstReasoning) {
                                         firstReasoning = false;
                                         if (thinkingDiv) thinkingDiv.style.display = 'none';
                                         responseDiv.style.display = 'block';
-                                        await yieldToUI(); // Immediate repaint
+                                        await yieldToUI();
                                         
                                         reasoningDiv = document.createElement('div');
                                         reasoningDiv.className = 'reasoning';
@@ -321,44 +318,39 @@
                                         `;
                                         contentDiv.insertBefore(reasoningDiv, responseDiv);
                                         reasoningContentElem = reasoningDiv.querySelector('.reasoning-content');
-                                        await yieldToUI(); // Ensure box is painted
+                                        await yieldToUI();
                                     }
-                                    
-                                    reasoningContentElem.textContent += data.reasoning;
+                                    reasoningContentElem.textContent += delta.reasoning_content;
                                     autoScroll();
-                                    await yieldToUI(); // Show each word as it arrives
+                                    await yieldToUI(); // Force repaint after each reasoning chunk
                                 }
                                 
-                                if (data.content) {
+                                // Handle content
+                                if (delta.content) {
                                     if (firstReasoning && thinkingDiv) {
                                         thinkingDiv.style.display = 'none';
                                         responseDiv.style.display = 'block';
                                         await yieldToUI();
                                         firstReasoning = false;
                                     }
-                                    fullResponse += data.content;
+                                    fullResponse += delta.content;
                                     responseDiv.textContent = fullResponse;
                                     autoScroll();
-                                    await yieldToUI(); // Stream final answer word by word
+                                    await yieldToUI(); // Force repaint after each content chunk
                                 }
-                                
-                                if (data.error) {
-                                    responseDiv.textContent = `⚠️ Error: ${data.error}`;
-                                    responseDiv.style.display = 'block';
-                                    if (thinkingDiv) thinkingDiv.style.display = 'none';
-                                }
-                            } catch (e) {}
+                            } catch (e) {
+                                console.warn('Parse error:', e);
+                            }
                         }
                     }
                 }
                 
-                // Clean up
                 if (thinkingDiv) thinkingDiv.remove();
                 const cursor = contentDiv.querySelector('.cursor');
                 if (cursor) cursor.remove();
                 
                 if (!fullResponse && !reasoningDiv) {
-                    responseDiv.textContent = 'No response received. The API may be rate-limited.';
+                    responseDiv.textContent = 'No response received.';
                     responseDiv.style.display = 'block';
                 }
                 
@@ -370,7 +362,7 @@
                 }
                 
             } catch (error) {
-                console.error('Fetch error:', error);
+                console.error(error);
                 contentDiv.innerHTML = `<em>⚠️ Network error: ${error.message}</em>`;
             } finally {
                 isStreaming = false;
