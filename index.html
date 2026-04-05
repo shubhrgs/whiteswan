@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhiteSwan AI - Real‑time Reasoning</title>
     <style>
+        /* (same styles as before – keep them) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -236,15 +237,9 @@
             }
         }
 
-        // Force a repaint by waiting for next animation frame and reading layout
-        async function forceRepaint() {
-            await new Promise(resolve => {
-                requestAnimationFrame(() => {
-                    // Force synchronous layout recalculation
-                    document.body.offsetHeight;
-                    resolve();
-                });
-            });
+        // Force a repaint by yielding to the event loop
+        async function yieldToUI() {
+            await new Promise(resolve => setTimeout(resolve, 0));
         }
 
         async function sendMessage() {
@@ -299,6 +294,9 @@
                     buffer = lines.pop() || '';
                     
                     for (const line of lines) {
+                        // Skip heartbeat comments
+                        if (line.startsWith(': ')) continue;
+                        
                         if (line.startsWith('data: ')) {
                             const dataStr = line.slice(6);
                             if (dataStr === '[DONE]') continue;
@@ -311,7 +309,7 @@
                                         firstReasoning = false;
                                         if (thinkingDiv) thinkingDiv.style.display = 'none';
                                         responseDiv.style.display = 'block';
-                                        await forceRepaint(); // Force immediate removal
+                                        await yieldToUI(); // Immediate repaint
                                         
                                         reasoningDiv = document.createElement('div');
                                         reasoningDiv.className = 'reasoning';
@@ -323,27 +321,25 @@
                                         `;
                                         contentDiv.insertBefore(reasoningDiv, responseDiv);
                                         reasoningContentElem = reasoningDiv.querySelector('.reasoning-content');
-                                        await forceRepaint(); // Ensure reasoning box is painted
+                                        await yieldToUI(); // Ensure box is painted
                                     }
                                     
-                                    // Append reasoning chunk and force repaint
                                     reasoningContentElem.textContent += data.reasoning;
                                     autoScroll();
-                                    await forceRepaint(); // Show each word as it arrives
+                                    await yieldToUI(); // Show each word as it arrives
                                 }
                                 
                                 if (data.content) {
                                     if (firstReasoning && thinkingDiv) {
-                                        // If no reasoning was shown, hide thinking placeholder now
                                         thinkingDiv.style.display = 'none';
                                         responseDiv.style.display = 'block';
-                                        await forceRepaint();
+                                        await yieldToUI();
                                         firstReasoning = false;
                                     }
                                     fullResponse += data.content;
                                     responseDiv.textContent = fullResponse;
                                     autoScroll();
-                                    await forceRepaint(); // Stream final answer word by word
+                                    await yieldToUI(); // Stream final answer word by word
                                 }
                                 
                                 if (data.error) {
